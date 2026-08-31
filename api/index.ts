@@ -7,20 +7,20 @@ import {
   findPreciseLocation,
   getKecamatanById,
   getKecamatanByName,
-} from '../src/data/banyumasRegions';
-import { EMERGENCY_CONTACTS } from '../src/data/emergencyContacts';
+} from '../src/data/banyumasRegions.js';
+import { EMERGENCY_CONTACTS } from '../src/data/emergencyContacts.js';
 import {
   generate30DayForecast,
   generateActiveAlerts,
   generateContinuousHourlyForecast,
   generateCurrentWeather,
   generateRadarGrid,
-} from '../src/services/weatherEngine';
+} from '../src/services/weatherEngine.js';
 import {
   fetchLiveBmkgWeather,
   fetchLiveBmkgAlerts,
   fetchDailyForecastCombined,
-} from '../src/services/bmkgLiveService';
+} from '../src/services/bmkgLiveService.js';
 
 const app = express();
 

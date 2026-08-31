@@ -6,8 +6,8 @@ import {
   Region,
   WeatherAlert,
   WeatherCondition,
-} from '../types/weather';
-import { BANYUMAS_KECAMATAN, getKecamatanById } from '../data/banyumasRegions';
+} from '../types/weather.js';
+import { BANYUMAS_KECAMATAN, getKecamatanById } from '../data/banyumasRegions.js';
 
 export const BMKG_WEATHER_CONDITIONS: Record<number, WeatherCondition> = {
   0: { code: 0, name: 'Cerah', icon: 'Sun', color: '#F59E0B', isRain: false },

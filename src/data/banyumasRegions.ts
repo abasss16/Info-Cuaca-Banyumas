@@ -1,5 +1,5 @@
-import { Region } from '../types/weather';
-import { BANYUMAS_KECAMATAN_BOUNDARY_MAP, BANYUMAS_OFFICIAL_COUNTY_BOUNDARY, BANYUMAS_KECAMATAN_CENTROIDS } from './banyumasGeoJson';
+import { Region } from '../types/weather.js';
+import { BANYUMAS_KECAMATAN_BOUNDARY_MAP, BANYUMAS_OFFICIAL_COUNTY_BOUNDARY, BANYUMAS_KECAMATAN_CENTROIDS } from './banyumasGeoJson.js';
 
 export const BANYUMAS_CENTER: [number, number] = [-7.4243, 109.2302]; // Center around Purwokerto/Banyumas
 export const BANYUMAS_BOUNDS: [[number, number], [number, number]] = [

@@ -1,6 +1,6 @@
-import { Region, CurrentWeather, DailyForecastItem, HourlyForecastItem, WeatherAlert, WeatherCondition } from '../types/weather';
-import { getAdm4Code, BANYUMAS_ADM4_MAP } from '../data/banyumasAdm4';
-import { BMKG_WEATHER_CONDITIONS, getWindArrow, getWIBTimeString, getWIBDate } from './weatherEngine';
+import { Region, CurrentWeather, DailyForecastItem, HourlyForecastItem, WeatherAlert, WeatherCondition } from '../types/weather.js';
+import { getAdm4Code, BANYUMAS_ADM4_MAP } from '../data/banyumasAdm4.js';
+import { BMKG_WEATHER_CONDITIONS, getWindArrow, getWIBTimeString, getWIBDate } from './weatherEngine.js';
 
 // Interface BMKG API Response (api.bmkg.go.id/publik/prakiraan-cuaca?adm4=...)
 export interface BmkgApiEntry {
@@ -1052,4 +1052,3 @@ export async function fetchDailyForecastCombined(
 
   return result;
 }
-

@@ -1,4 +1,4 @@
-import { EmergencyContact } from '../types/weather';
+import { EmergencyContact } from '../types/weather.js';
 
 export const EMERGENCY_CONTACTS: EmergencyContact[] = [
   {
