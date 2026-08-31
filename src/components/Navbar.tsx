@@ -9,6 +9,7 @@ import {
   Home,
   Layers,
   Info,
+  RefreshCw,
 } from 'lucide-react';
 import { Region } from '../types/weather';
 import { getWIBDateFormatted } from '../services/weatherEngine';
@@ -20,6 +21,8 @@ interface NavbarProps {
   selectedVillage?: string;
   hasActiveAlert?: boolean;
   onOpenAbout?: () => void;
+  onRefresh?: () => void;
+  isLoading?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -29,6 +32,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedVillage,
   hasActiveAlert = false,
   onOpenAbout,
+  onRefresh,
+  isLoading = false,
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -133,19 +138,42 @@ export const Navbar: React.FC<NavbarProps> = ({
               );
             })}
 
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={isLoading}
+                title="Tarik data live BMKG detik ini juga"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100/80 active:scale-95 transition-all border border-sky-200/70 shadow-2xs cursor-pointer ml-1"
+              >
+                <RefreshCw size={13} className={isLoading ? 'animate-spin text-sky-600' : 'text-sky-600'} />
+                <span>{isLoading ? 'Mengambil...' : ''}</span>
+              </button>
+            )}
+
             {onOpenAbout && (
               <button
                 onClick={onOpenAbout}
                 title="Tentang Sistem"
-                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <Info size={16} />
               </button>
             )}
           </nav>
 
-          {/* Mobile Hamburger Button */}
-          <div className="flex items-center gap-2 lg:hidden">
+          {/* Mobile Action Buttons */}
+          <div className="flex items-center gap-1.5 lg:hidden">
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={isLoading}
+                title="Tarik data live BMKG detik ini"
+                className="p-2 rounded-full bg-sky-50 text-sky-700 border border-sky-200/70 hover:bg-sky-100 transition-colors"
+                aria-label="Refresh cuaca live BMKG"
+              >
+                <RefreshCw size={14} className={isLoading ? 'animate-spin text-sky-600' : ''} />
+              </button>
+            )}
             {hasActiveAlert && (
               <button
                 onClick={() => onSelectTab('alerts')}

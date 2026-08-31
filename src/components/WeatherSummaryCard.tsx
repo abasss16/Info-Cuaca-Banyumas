@@ -48,10 +48,11 @@ export const WeatherSummaryCard: React.FC<WeatherSummaryCardProps> = ({
               <button
                 onClick={onRefresh}
                 disabled={isLoading}
-                title="Perbarui data BMKG"
-                className="p-1.5 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/15 cursor-pointer shrink-0"
+                title="Tarik data live BMKG detik ini juga (Bypass cache)"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] sm:text-xs font-semibold text-white bg-white/15 hover:bg-white/25 active:scale-95 disabled:opacity-75 rounded-xl transition-all border border-white/25 shadow-xs cursor-pointer shrink-0 group"
               >
-                <RefreshCw size={13} className={isLoading ? 'animate-spin text-white' : ''} />
+                <RefreshCw size={12} className={`transition-transform ${isLoading ? 'animate-spin text-amber-300' : 'group-hover:rotate-180 duration-500'}`} />
+                <span className="hidden xs:inline sm:inline">{isLoading ? 'Memperbarui...' : 'Refresh'}</span>
               </button>
             )}
           </div>

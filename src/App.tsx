@@ -91,16 +91,18 @@ export default function App() {
     async (
       region: Region,
       village?: string,
-      exactCoords?: { lat: number; lng: number; accuracy?: number; name?: string } | null
+      exactCoords?: { lat: number; lng: number; accuracy?: number; name?: string } | null,
+      forceFresh?: boolean
     ) => {
       setIsLoading(true);
       const targetVillage = village || region.villages?.[0] || region.name;
 
       try {
+        const freshParam = forceFresh ? `&fresh=true&t=${Date.now()}` : '';
         const liveRes = await fetch(
           `/api/weather/live-bmkg?regionId=${encodeURIComponent(
             region.id
-          )}&village=${encodeURIComponent(targetVillage)}`
+          )}&village=${encodeURIComponent(targetVillage)}${freshParam}`
         );
         const forecastRes = await fetch(
           `/api/weather/forecast?regionId=${encodeURIComponent(
@@ -175,7 +177,7 @@ export default function App() {
   };
 
   const handleRefresh = () => {
-    loadWeatherData(selectedRegion, selectedVillage, userExactCoords);
+    loadWeatherData(selectedRegion, selectedVillage, userExactCoords, true);
     loadAlerts();
   };
 
@@ -191,6 +193,8 @@ export default function App() {
         selectedVillage={selectedVillage}
         hasActiveAlert={hasActiveAlert}
         onOpenAbout={() => setAboutModalOpen(true)}
+        onRefresh={handleRefresh}
+        isLoading={isLoading}
       />
 
       {/* Main Content Area - DILEBARKAN DARI max-w-4xl MENJADI max-w-7xl */}

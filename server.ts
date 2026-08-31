@@ -268,10 +268,11 @@ async function startServer() {
     try {
       const regionId = (req.query.regionId as string) || '33.02.27';
       const village = req.query.village as string | undefined;
+      const forceFresh = req.query.fresh === 'true' || req.query.refresh === '1';
       const region = getKecamatanById(regionId) || BANYUMAS_KECAMATAN[0];
 
       // Try fetching live data from official BMKG endpoint
-      const liveData = await fetchLiveBmkgWeather(region, village);
+      const liveData = await fetchLiveBmkgWeather(region, village, forceFresh);
 
       if (liveData) {
         return res.json({

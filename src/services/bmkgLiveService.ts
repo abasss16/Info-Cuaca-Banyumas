@@ -1,5 +1,5 @@
 import { Region, CurrentWeather, DailyForecastItem, HourlyForecastItem, WeatherAlert, WeatherCondition } from '../types/weather';
-import { getAdm4Code } from '../data/banyumasAdm4';
+import { getAdm4Code, BANYUMAS_ADM4_MAP } from '../data/banyumasAdm4';
 import { BMKG_WEATHER_CONDITIONS, getWindArrow, getWIBTimeString, getWIBDate } from './weatherEngine';
 
 // Interface BMKG API Response (api.bmkg.go.id/publik/prakiraan-cuaca?adm4=...)
@@ -15,8 +15,13 @@ export interface BmkgApiEntry {
   wd: string; // wind direction (e.g. "E", "NE", "N", "SE", "S", "SW", "W", "NW", or Indonesian "Timur")
   wd_to?: string;
   tcc?: number; // cloud cover %
+  tp?: number; // precipitation mm
   vs_text: string; // e.g. "< 6 km", "> 10 km"
   analysis_date?: string;
+  datetime?: string;
+  image?: string;
+  wd_deg?: number;
+  vs?: number;
 }
 
 export interface BmkgApiResponse {
@@ -187,6 +192,38 @@ export function mapDescToWeatherCode(desc: string): number {
   if (d.includes('berawan') || d.includes('cloudy')) return 3;
   if (d.includes('cerah') || d.includes('clear')) return 0;
   return 3;
+}
+
+// Resolve BMKG Weather Condition synchronizing raw weather code with official BMKG weather description and precipitation
+export function resolveBmkgCondition(rawCode?: number, weatherDesc?: string, tp?: number): WeatherCondition {
+  const desc = (weatherDesc || '').trim();
+  let code = rawCode !== undefined ? rawCode : mapDescToWeatherCode(desc);
+
+  // If BMKG provides an explicit textual weather description, synchronize code with description
+  if (desc) {
+    const descCode = mapDescToWeatherCode(desc);
+    if (descCode === 0 && (code === 1 || code === 2)) {
+      code = 0;
+    } else if (descCode >= 60 && code < 60) {
+      code = descCode;
+    } else if (descCode === 1 && code === 0) {
+      code = 1;
+    }
+  }
+
+  // If precipitation (tp) is >= 0.5 mm and not clear, BMKG classifies as light rain
+  if (typeof tp === 'number' && tp >= 0.5 && code < 60 && !desc.toLowerCase().includes('cerah')) {
+    code = 60;
+  }
+
+  const base = BMKG_WEATHER_CONDITIONS[code] || BMKG_WEATHER_CONDITIONS[3];
+  return {
+    ...base,
+    code,
+    name: (typeof tp === 'number' && tp >= 0.5 && code === 60 && !desc.toLowerCase().includes('hujan'))
+      ? 'Hujan Ringan'
+      : (desc || base.name),
+  };
 }
 
 /**
@@ -410,7 +447,8 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache to avoid rate limits
 
 export async function fetchLiveBmkgWeather(
   region: Region,
-  villageName?: string
+  villageName?: string,
+  forceFresh?: boolean
 ): Promise<{
   current: CurrentWeather;
   hourly: HourlyForecastItem[];
@@ -421,9 +459,9 @@ export async function fetchLiveBmkgWeather(
   const adm4Code = getAdm4Code(region.id, villageName);
   const cacheKey = `${region.id}_${villageName || 'default'}_${adm4Code}`;
 
-  // Check cache first
+  // Check cache first (skip if forceFresh is requested)
   const cached = bmkgCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+  if (!forceFresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.data;
   }
 
@@ -520,14 +558,7 @@ export async function fetchLiveBmkgWeather(
       const hour = parseInt(hourStr, 10) || entryDate.getHours();
       const isNight = hour >= 18 || hour < 6;
 
-      const code = entry.weather !== undefined ? entry.weather : mapDescToWeatherCode(entry.weather_desc);
-      const cond = BMKG_WEATHER_CONDITIONS[code] || {
-        code,
-        name: entry.weather_desc || 'Berawan',
-        icon: 'Cloud',
-        color: '#64748B',
-        isRain: code >= 60,
-      };
+      const cond = resolveBmkgCondition(entry.weather, entry.weather_desc, entry.tp);
 
       const windDirection = translateWindDirection(entry.wd);
       const dateFormatted = new Intl.DateTimeFormat('id-ID', {
@@ -536,6 +567,10 @@ export async function fetchLiveBmkgWeather(
         month: 'short',
         year: 'numeric',
       }).format(entryDate);
+
+      const rainProb = cond.isRain || (typeof entry.tp === 'number' && entry.tp >= 0.5)
+        ? Math.min(95, Math.round(75 + (entry.tp || 0) * 15))
+        : (typeof entry.tp === 'number' && entry.tp > 0 ? Math.round(45 + entry.tp * 50) : 20);
 
       return {
         time: entryDate.toISOString(),
@@ -546,7 +581,7 @@ export async function fetchLiveBmkgWeather(
         temp: typeof entry.t === 'number' ? entry.t : 26,
         condition: cond,
         humidity: typeof entry.hu === 'number' ? entry.hu : 80,
-        rainProb: cond.isRain ? 75 : 20,
+        rainProb,
         windSpeed: typeof entry.ws === 'number' ? Math.round(entry.ws * 10) / 10 : 3.8,
         windDirection,
         windArrow: getWindArrow(windDirection),
@@ -568,14 +603,8 @@ export async function fetchLiveBmkgWeather(
       }
     }
 
-    const currentCode = closestEntry.weather !== undefined ? closestEntry.weather : mapDescToWeatherCode(closestEntry.weather_desc);
-    const currentCond = BMKG_WEATHER_CONDITIONS[currentCode] || {
-      code: currentCode,
-      name: closestEntry.weather_desc || 'Berawan',
-      icon: 'Cloud',
-      color: '#64748B',
-      isRain: currentCode >= 60,
-    };
+    const currentCond = resolveBmkgCondition(closestEntry.weather, closestEntry.weather_desc, closestEntry.tp);
+    const currentCode = currentCond.code;
 
     const currentWindDir = translateWindDirection(closestEntry.wd);
     const currentTemp = typeof closestEntry.t === 'number' ? closestEntry.t : 26;
@@ -592,7 +621,7 @@ export async function fetchLiveBmkgWeather(
       regionId: region.id,
       regionName: region.name,
       kecamatanName: region.name,
-      desaName: villageName || region.villages?.[0],
+      desaName: villageName || BANYUMAS_ADM4_MAP[region.id]?.defaultDesaName || region.villages?.[0] || 'Pusat Kecamatan',
       lat: region.lat,
       lng: region.lng,
       temp: currentTemp,
@@ -607,7 +636,7 @@ export async function fetchLiveBmkgWeather(
       visibilityText: visInfo.text,
       uvIndex: wibHour >= 10 && wibHour <= 14 ? 6 : 1,
       uvDescription: wibHour >= 10 && wibHour <= 14 ? 'Tinggi' : 'Rendah',
-      rainfallPastHour: currentCond.isRain ? 2.5 : 0,
+      rainfallPastHour: typeof closestEntry.tp === 'number' ? closestEntry.tp : (currentCond.isRain ? 2.5 : 0),
       cloudCover: typeof closestEntry.tcc === 'number' ? closestEntry.tcc : 65,
       updatedAt: new Date().toISOString(),
       updatedAtFormatted: getWIBTimeString(),
