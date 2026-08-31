@@ -1,0 +1,10 @@
+{
+  "name": "Informasi Cuaca Banyumas",
+  "description": "Platform pemantauan dan informasi cuaca real-time terintegrasi untuk seluruh wilayah Kabupaten Banyumas berbasis data BMKG dan visualisasi cuaca interaktif.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

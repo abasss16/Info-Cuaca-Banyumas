@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <defs>
+    <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="60%" stop-color="#bae6fd"/>
+      <stop offset="100%" stop-color="#e0f2fe"/>
+    </linearGradient>
+    <linearGradient id="mountainGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2d6a4f"/>
+      <stop offset="100%" stop-color="#1b4332"/>
+    </linearGradient>
+    <linearGradient id="hillGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#52b788"/>
+      <stop offset="100%" stop-color="#40916c"/>
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  
+  <rect width="128" height="128" rx="28" fill="url(#skyGrad)"/>
+  
+  <!-- Sun -->
+  <circle cx="88" cy="38" r="16" fill="url(#sunGrad)"/>
+  
+  <!-- Mount Slamet Profile -->
+  <polygon points="64,24 16,104 112,104" fill="url(#mountainGrad)"/>
+  <!-- Mountain Snow/Peak Highlight -->
+  <polygon points="64,24 50,54 64,48 78,54" fill="#f8fafc" opacity="0.9"/>
+  
+  <!-- Rolling Banyumas Hills -->
+  <path d="M0,88 Q35,68 70,86 T128,82 L128,128 L0,128 Z" fill="url(#hillGrad)"/>
+  
+  <!-- Cloud Overlay -->
+  <path d="M28,68 Q28,58 38,58 Q42,50 52,50 Q62,50 66,58 Q74,58 74,68 Q74,76 64,76 L38,76 Q28,76 28,68 Z" fill="#ffffff" opacity="0.95"/>
+  
+  <!-- Raindrops -->
+  <line x1="38" y1="84" x2="34" y2="92" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="48" y1="84" x2="44" y2="92" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="58" y1="84" x2="54" y2="92" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

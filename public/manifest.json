@@ -1,0 +1,17 @@
+{
+  "name": "Informasi Cuaca Banyumas",
+  "short_name": "Cuaca Banyumas",
+  "description": "Platform Pemantauan dan Informasi Cuaca Real-Time Kabupaten Banyumas Berbasis BMKG",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#347b59",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
