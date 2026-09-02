@@ -14,6 +14,10 @@ import {
   BANYUMAS_KECAMATAN,
   BANYUMAS_VILLAGES_COORDS,
   findPreciseLocation,
+  getDesaCoordinates,
+  findNearestDesaFromCoords,
+  getKecamatanById,
+  ALL_BANYUMAS_DESA,
 } from '../data/banyumasRegions';
 
 interface RegionSelectorProps {
@@ -84,40 +88,44 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({
       coords?: { lat: number; lng: number };
     }> = [];
 
+    // 1. Search in all Kecamatan
     for (const kec of BANYUMAS_KECAMATAN) {
-      // Pencocokan Murni Nama Kecamatan (tanpa imbuhan "Kec.")
       if (kec.name.toLowerCase().includes(cleanQuery)) {
+        const defaultVil = kec.villages?.[0] || kec.name;
+        const vilCoord = getDesaCoordinates(kec.id, defaultVil);
         results.push({
           type: 'kecamatan',
           displayName: `Kec. ${kec.name}`,
           kecamatan: kec,
-          villageName: kec.villages?.[0] || kec.name,
-          coords: { lat: kec.lat, lng: kec.lng },
+          villageName: defaultVil,
+          coords: vilCoord ? { lat: vilCoord.lat, lng: vilCoord.lng } : { lat: kec.lat, lng: kec.lng },
         });
       }
+    }
 
-      // Pencocokan Murni Nama Desa (tanpa imbuhan "Desa/Kel.")
-      if (kec.villages) {
-        for (const vil of kec.villages) {
-          if (vil.toLowerCase().includes(cleanQuery)) {
-            const vilCoord = BANYUMAS_VILLAGES_COORDS.find(
-              (vc) =>
-                vc.kecamatanId === kec.id &&
-                vc.name.toLowerCase() === vil.toLowerCase()
-            );
+    // 2. Search in all 331 Desa/Kelurahan from Geoportal dataset
+    for (const d of ALL_BANYUMAS_DESA) {
+      if (d.name.toLowerCase().includes(cleanQuery)) {
+        const kec = getKecamatanById(d.kecamatanId);
+        if (kec) {
+          // Avoid duplicate if already exact match
+          const alreadyAdded = results.some(
+            (r) => r.type === 'desa' && r.villageName?.toLowerCase() === d.name.toLowerCase() && r.kecamatan.id === kec.id
+          );
+          if (!alreadyAdded) {
             results.push({
               type: 'desa',
-              displayName: `Desa/Kel. ${vil}`,
+              displayName: `Desa/Kel. ${d.name}`,
               kecamatan: kec,
-              villageName: vil,
-              coords: vilCoord ? { lat: vilCoord.lat, lng: vilCoord.lng } : undefined,
+              villageName: d.name,
+              coords: { lat: d.lat, lng: d.lng },
             });
           }
         }
       }
     }
 
-    return results.slice(0, 10);
+    return results.slice(0, 12);
   }, [searchQuery]);
 
   const handleDetectLocation = () => {
@@ -336,10 +344,14 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({
                     key={kec.id}
                     id={`kec-option-${kec.id}`}
                     onClick={() => {
+                      const defaultVil = kec.villages?.[0] || kec.name;
+                      const vilCoord = getDesaCoordinates(kec.id, defaultVil);
                       onSelectRegion(
                         kec,
-                        kec.villages?.[0] || kec.name,
-                        { lat: kec.lat, lng: kec.lng, name: kec.name }
+                        defaultVil,
+                        vilCoord
+                          ? { lat: vilCoord.lat, lng: vilCoord.lng, name: defaultVil }
+                          : { lat: kec.lat, lng: kec.lng, name: kec.name }
                       );
                       setKecamatanDropdownOpen(false);
                     }}
@@ -392,11 +404,7 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({
                     key={`${vil}-${idx}`}
                     id={`village-option-${idx}`}
                     onClick={() => {
-                      const vilCoord = BANYUMAS_VILLAGES_COORDS.find(
-                        (vc) =>
-                          vc.kecamatanId === selectedRegion.id &&
-                          vc.name.toLowerCase() === vil.toLowerCase()
-                      );
+                      const vilCoord = getDesaCoordinates(selectedRegion.id, vil);
                       onSelectRegion(
                         selectedRegion,
                         vil,

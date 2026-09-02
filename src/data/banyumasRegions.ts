@@ -1,5 +1,5 @@
-import { Region } from '../types/weather.js';
-import { BANYUMAS_KECAMATAN_BOUNDARY_MAP, BANYUMAS_OFFICIAL_COUNTY_BOUNDARY, BANYUMAS_KECAMATAN_CENTROIDS } from './banyumasGeoJson.js';
+import { Region } from '../types/weather';
+import { BANYUMAS_KECAMATAN_BOUNDARY_MAP, BANYUMAS_OFFICIAL_COUNTY_BOUNDARY, BANYUMAS_KECAMATAN_CENTROIDS } from './banyumasGeoJson';
 
 export const BANYUMAS_CENTER: [number, number] = [-7.4243, 109.2302]; // Center around Purwokerto/Banyumas
 export const BANYUMAS_BOUNDS: [[number, number], [number, number]] = [
@@ -375,7 +375,17 @@ export const BANYUMAS_KECAMATAN: Region[] = [
   },
 ];
 
-// Database of precise village/kelurahan coordinates across Banyumas
+import {
+  ALL_BANYUMAS_DESA,
+  getDesaCoordinates,
+  findNearestDesaFromCoords,
+  DesaSpatialInfo,
+} from './banyumasDesaGeoportal';
+
+export { ALL_BANYUMAS_DESA, getDesaCoordinates, findNearestDesaFromCoords };
+export type { DesaSpatialInfo };
+
+// Database of precise village/kelurahan coordinates across Banyumas (All 331 Desa from Geoportal)
 export interface VillageCoordInfo {
   name: string;
   kecamatanId: string;
@@ -384,75 +394,7 @@ export interface VillageCoordInfo {
   lng: number;
 }
 
-export const BANYUMAS_VILLAGES_COORDS: VillageCoordInfo[] = [
-  // Purwokerto Timur
-  { name: 'Sokanegara', kecamatanId: '33.02.26', kecamatanName: 'Purwokerto Timur', lat: -7.4210, lng: 109.2300 },
-  { name: 'Kranji', kecamatanId: '33.02.26', kecamatanName: 'Purwokerto Timur', lat: -7.4262, lng: 109.2330 },
-  { name: 'Purwokerto Lor', kecamatanId: '33.02.26', kecamatanName: 'Purwokerto Timur', lat: -7.4170, lng: 109.2445 },
-  { name: 'Purwokerto Wetan', kecamatanId: '33.02.26', kecamatanName: 'Purwokerto Timur', lat: -7.4255, lng: 109.2465 },
-  { name: 'Mersi', kecamatanId: '33.02.26', kecamatanName: 'Purwokerto Timur', lat: -7.4280, lng: 109.2570 },
-  { name: 'Arcawinangun', kecamatanId: '33.02.26', kecamatanName: 'Purwokerto Timur', lat: -7.4145, lng: 109.2560 },
-
-  // Purwokerto Barat
-  { name: 'Kedungwuluh', kecamatanId: '33.02.25', kecamatanName: 'Purwokerto Barat', lat: -7.4266181, lng: 109.2215 },
-  { name: 'Kober', kecamatanId: '33.02.25', kecamatanName: 'Purwokerto Barat', lat: -7.4135, lng: 109.2215 },
-  { name: 'Bantarsoka', kecamatanId: '33.02.25', kecamatanName: 'Purwokerto Barat', lat: -7.4275, lng: 109.2190 },
-  { name: 'Rejasari', kecamatanId: '33.02.25', kecamatanName: 'Purwokerto Barat', lat: -7.4265, lng: 109.2120 },
-  { name: 'Pasirmuncang', kecamatanId: '33.02.25', kecamatanName: 'Purwokerto Barat', lat: -7.4335, lng: 109.2165 },
-  { name: 'Pasir Kidul', kecamatanId: '33.02.25', kecamatanName: 'Purwokerto Barat', lat: -7.4365, lng: 109.2105 },
-  { name: 'Karanglewas Lor', kecamatanId: '33.02.25', kecamatanName: 'Purwokerto Barat', lat: -7.4085, lng: 109.2130 },
-
-  // Purwokerto Utara
-  { name: 'Bancarkembar', kecamatanId: '33.02.27', kecamatanName: 'Purwokerto Utara', lat: -7.4045, lng: 109.2430 },
-  { name: 'Grendeng', kecamatanId: '33.02.27', kecamatanName: 'Purwokerto Utara', lat: -7.4110, lng: 109.2455 },
-  { name: 'Karangwangkal', kecamatanId: '33.02.27', kecamatanName: 'Purwokerto Utara', lat: -7.3950, lng: 109.2485 },
-  { name: 'Sumampir', kecamatanId: '33.02.27', kecamatanName: 'Purwokerto Utara', lat: -7.3965, lng: 109.2380 },
-  { name: 'Bobosan', kecamatanId: '33.02.27', kecamatanName: 'Purwokerto Utara', lat: -7.4045, lng: 109.2275 },
-  { name: 'Pabuaran', kecamatanId: '33.02.27', kecamatanName: 'Purwokerto Utara', lat: -7.3915, lng: 109.2465 },
-  { name: 'Purwanegara', kecamatanId: '33.02.27', kecamatanName: 'Purwokerto Utara', lat: -7.4020, lng: 109.2345 },
-
-  // Purwokerto Selatan
-  { name: 'Berkoh', kecamatanId: '33.02.24', kecamatanName: 'Purwokerto Selatan', lat: -7.4385, lng: 109.2535 },
-  { name: 'Tanjung', kecamatanId: '33.02.24', kecamatanName: 'Purwokerto Selatan', lat: -7.4380, lng: 109.2285 },
-  { name: 'Karangklesem', kecamatanId: '33.02.24', kecamatanName: 'Purwokerto Selatan', lat: -7.4530, lng: 109.2380 },
-  { name: 'Karangpucung', kecamatanId: '33.02.24', kecamatanName: 'Purwokerto Selatan', lat: -7.4450, lng: 109.2330 },
-  { name: 'Teluk', kecamatanId: '33.02.24', kecamatanName: 'Purwokerto Selatan', lat: -7.4465, lng: 109.2450 },
-  { name: 'Purwokerto Kulon', kecamatanId: '33.02.24', kecamatanName: 'Purwokerto Selatan', lat: -7.4315, lng: 109.2310 },
-
-  // Sokaraja
-  { name: 'Sokaraja Kulon', kecamatanId: '33.02.19', kecamatanName: 'Sokaraja', lat: -7.4520, lng: 109.2640 },
-  { name: 'Sokaraja Tengah', kecamatanId: '33.02.19', kecamatanName: 'Sokaraja', lat: -7.4540, lng: 109.2680 },
-  { name: 'Sokaraja Lor', kecamatanId: '33.02.19', kecamatanName: 'Sokaraja', lat: -7.4480, lng: 109.2670 },
-  { name: 'Karangnanas', kecamatanId: '33.02.19', kecamatanName: 'Sokaraja', lat: -7.4550, lng: 109.2780 },
-
-  // Baturraden
-  { name: 'Karangmangu', kecamatanId: '33.02.22', kecamatanName: 'Baturraden', lat: -7.3190, lng: 109.2280 },
-  { name: 'Ketenger', kecamatanId: '33.02.22', kecamatanName: 'Baturraden', lat: -7.3120, lng: 109.2180 },
-  { name: 'Kemutug Lor', kecamatanId: '33.02.22', kecamatanName: 'Baturraden', lat: -7.3250, lng: 109.2350 },
-  { name: 'Rempoah', kecamatanId: '33.02.22', kecamatanName: 'Baturraden', lat: -7.3480, lng: 109.2340 },
-
-  // Sumbang
-  { name: 'Sumbang', kecamatanId: '33.02.21', kecamatanName: 'Sumbang', lat: -7.3590, lng: 109.2710 },
-  { name: 'Tambaksogra', kecamatanId: '33.02.21', kecamatanName: 'Sumbang', lat: -7.3750, lng: 109.2620 },
-  { name: 'Karanggintung', kecamatanId: '33.02.21', kecamatanName: 'Sumbang', lat: -7.3720, lng: 109.2550 },
-
-  // Kembaran
-  { name: 'Dukuhwaluh', kecamatanId: '33.02.20', kecamatanName: 'Kembaran', lat: -7.4120, lng: 109.2680 },
-  { name: 'Ledug', kecamatanId: '33.02.20', kecamatanName: 'Kembaran', lat: -7.4180, lng: 109.2620 },
-  { name: 'Kembaran', kecamatanId: '33.02.20', kecamatanName: 'Kembaran', lat: -7.4210, lng: 109.2790 },
-
-  // Ajibarang
-  { name: 'Ajibarang Kulon', kecamatanId: '33.02.14', kecamatanName: 'Ajibarang', lat: -7.4120, lng: 109.0720 },
-  { name: 'Ajibarang Wetan', kecamatanId: '33.02.14', kecamatanName: 'Ajibarang', lat: -7.4130, lng: 109.0780 },
-
-  // Wangon
-  { name: 'Wangon', kecamatanId: '33.02.02', kecamatanName: 'Wangon', lat: -7.5186, lng: 109.0531 },
-  { name: 'Klapagading', kecamatanId: '33.02.02', kecamatanName: 'Wangon', lat: -7.5250, lng: 109.0620 },
-
-  // Cilongok
-  { name: 'Cilongok', kecamatanId: '33.02.17', kecamatanName: 'Cilongok', lat: -7.3986, lng: 109.1417 },
-  { name: 'Pernasidi', kecamatanId: '33.02.17', kecamatanName: 'Cilongok', lat: -7.4040, lng: 109.1380 },
-];
+export const BANYUMAS_VILLAGES_COORDS: VillageCoordInfo[] = ALL_BANYUMAS_DESA;
 
 // Map of pastel colors matching official administrative map (image.png)
 export const KECAMATAN_ADMIN_COLORS: Record<string, { fill: string; stroke: string }> = {

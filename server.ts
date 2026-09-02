@@ -9,6 +9,8 @@ import {
   findPreciseLocation,
   getKecamatanById,
   getKecamatanByName,
+  ALL_BANYUMAS_DESA,
+  getDesaCoordinates,
 } from './src/data/banyumasRegions';
 import { EMERGENCY_CONTACTS } from './src/data/emergencyContacts';
 import {
@@ -98,26 +100,34 @@ async function startServer() {
 
       for (const kec of BANYUMAS_KECAMATAN) {
         if (kec.name.toLowerCase().includes(q)) {
+          const defaultVil = kec.villages?.[0] || kec.name;
+          const vilCoord = getDesaCoordinates(kec.id, defaultVil);
           results.push({
             name: kec.name,
             type: 'kecamatan',
             kecamatanId: kec.id,
             kecamatanName: kec.name,
-            lat: kec.lat,
-            lng: kec.lng,
+            lat: vilCoord ? vilCoord.lat : kec.lat,
+            lng: vilCoord ? vilCoord.lng : kec.lng,
           });
         }
+      }
 
-        if (kec.villages) {
-          for (const vil of kec.villages) {
-            if (vil.toLowerCase().includes(q)) {
+      for (const d of ALL_BANYUMAS_DESA) {
+        if (d.name.toLowerCase().includes(q)) {
+          const kec = getKecamatanById(d.kecamatanId);
+          if (kec) {
+            const alreadyAdded = results.some(
+              (r) => r.type === 'desa' && r.name.toLowerCase() === d.name.toLowerCase() && r.kecamatanId === kec.id
+            );
+            if (!alreadyAdded) {
               results.push({
-                name: vil,
+                name: d.name,
                 type: 'desa',
                 kecamatanId: kec.id,
                 kecamatanName: kec.name,
-                lat: kec.lat,
-                lng: kec.lng,
+                lat: d.lat,
+                lng: d.lng,
               });
             }
           }

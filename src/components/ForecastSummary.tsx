@@ -1,5 +1,5 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Info, Calendar, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Calendar, Droplets } from 'lucide-react';
 import { DailyForecastItem, Region, HourlyForecastItem } from '../types/weather';
 import { WeatherIcon } from './WeatherIcon';
 import { generateContinuousHourlyForecast } from '../services/weatherEngine';
@@ -22,23 +22,83 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
 
-  // Generate continuous hourly items if live hourly data is not passed
+  // 1. Urutkan & Bikin Data Per Jam Kontinu
   const displayHourlyData = useMemo<HourlyForecastItem[]>(() => {
+    let baseData: HourlyForecastItem[] = [];
+
     if (liveHourlyData && liveHourlyData.length > 0) {
-      return liveHourlyData;
+      baseData = [...liveHourlyData];
+    } else {
+      const region = selectedRegion || {
+        id: '33.02.27',
+        name: 'Purwokerto Utara',
+        type: 'kecamatan',
+        lat: -7.4008,
+        lng: 109.2458,
+        elevationMeters: 130,
+      };
+      baseData = generateContinuousHourlyForecast(region, undefined, 48);
     }
-    const region = selectedRegion || {
-      id: '33.02.27',
-      name: 'Purwokerto Utara',
-      type: 'kecamatan',
-      lat: -7.4008,
-      lng: 109.2458,
-      elevationMeters: 130,
-    };
-    return generateContinuousHourlyForecast(region, undefined, 24);
+
+    const sorted = baseData.sort((a, b) => {
+      const timeA = new Date(a.time).getTime();
+      const timeB = new Date(b.time).getTime();
+      return timeA - timeB;
+    });
+
+    const continuous: HourlyForecastItem[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+      continuous.push(current);
+
+      if (i < sorted.length - 1) {
+        const next = sorted[i + 1];
+        const timeCurrent = new Date(current.time).getTime();
+        const timeNext = new Date(next.time).getTime();
+        const diffHours = Math.round((timeNext - timeCurrent) / (1000 * 60 * 60));
+
+        if (diffHours > 1 && diffHours <= 6) {
+          for (let h = 1; h < diffHours; h++) {
+            const fillTime = new Date(timeCurrent + h * 60 * 60 * 1000);
+            const hourNum = fillTime.getHours();
+            const ratio = h / diffHours;
+
+            const fillTemp = Math.round((current.temp + (next.temp - current.temp) * ratio) * 10) / 10;
+            const fillHum = Math.round(current.humidity + (next.humidity - current.humidity) * ratio);
+            const fillWind = Math.round((current.windSpeed + (next.windSpeed - current.windSpeed) * ratio) * 10) / 10;
+
+            const dateFormatted = new Intl.DateTimeFormat('id-ID', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              timeZone: 'Asia/Jakarta',
+            }).format(fillTime);
+
+            continuous.push({
+              time: fillTime.toISOString(),
+              timeFormatted: `${String(hourNum).padStart(2, '0')}.00`,
+              date: fillTime.toISOString().split('T')[0],
+              dateFormatted,
+              hour: hourNum,
+              temp: fillTemp,
+              condition: ratio < 0.5 ? current.condition : next.condition,
+              humidity: fillHum,
+              rainProb: Math.round(current.rainProb + (next.rainProb - current.rainProb) * ratio),
+              windSpeed: fillWind,
+              windDirection: current.windDirection,
+              windArrow: current.windArrow,
+              visibility: current.visibility,
+              isNight: hourNum >= 18 || hourNum < 6,
+            });
+          }
+        }
+      }
+    }
+
+    return continuous;
   }, [liveHourlyData, selectedRegion]);
 
-  // Group hourly forecast by Date
+  // 2. Grouping Berdasarkan Tanggal untuk Header
   const groupedByDate = useMemo(() => {
     const groups: { dateFormatted: string; items: HourlyForecastItem[] }[] = [];
     displayHourlyData.forEach((item) => {
@@ -55,10 +115,9 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
     return groups;
   }, [displayHourlyData]);
 
-  // Scroll handlers for navigation arrows
   const handleScroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
-      const scrollAmount = 280;
+      const scrollAmount = 288; // 4 kartu * 72px
       scrollContainerRef.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth',
@@ -66,9 +125,9 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
     }
   };
 
-  const formatSpeed = (val: number) => {
-    return val.toString().replace('.', ',');
-  };
+  const formatSpeed = (val: number) => val.toString().replace('.', ',');
+
+  const ITEM_WIDTH = 72; // Ukuran tetap per kolom jam (72px)
 
   return (
     <div className="w-full bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 border border-slate-200/90 shadow-2xs transition-all space-y-3.5 sm:space-y-5">
@@ -79,7 +138,6 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
             Prakiraan per Jam (WIB)
           </h3>
 
-          {/* Live Badge */}
           {isLive ? (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -100,7 +158,6 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
             <Info size={16} className="stroke-[2.2] sm:w-[18px] sm:h-[18px]" />
           </button>
 
-          {/* Info Tooltip Popover */}
           {showInfoTooltip && (
             <div className="absolute top-8 left-0 z-30 w-64 sm:w-72 p-3 bg-slate-900/95 text-white text-xs rounded-xl shadow-xl backdrop-blur-md border border-slate-700 animate-in fade-in zoom-in-95">
               <p className="font-bold text-sky-400 mb-1">Prakiraan Cuaca Resmi BMKG</p>
@@ -111,7 +168,6 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
           )}
         </div>
 
-        {/* Action Controls */}
         <div className="flex items-center gap-1.5 shrink-0">
           {onViewAll && (
             <button
@@ -123,7 +179,6 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
             </button>
           )}
 
-          {/* Nav Buttons (Hidden di HP sangat kecil jika tidak muat, scroll gesture sudah cukup) */}
           <div className="hidden xs:flex items-center gap-1">
             <button
               onClick={() => handleScroll('left')}
@@ -143,21 +198,21 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
         </div>
       </div>
 
-      {/* Main Horizontal Scroll Container */}
+      {/* Main Container */}
       <div
         ref={scrollContainerRef}
-        className="overflow-x-auto pb-2 pt-1 select-none no-scrollbar touch-pan-x"
+        className="overflow-x-auto pb-1.5 pt-0.5 select-none no-scrollbar touch-pan-x scroll-smooth"
       >
-        <div className="inline-flex flex-col min-w-full">
-          {/* Row 0: Header Tanggal */}
-          <div className="flex border-b border-slate-100 pb-1.5">
+        <div className="inline-flex flex-col gap-2">
+          {/* Row 0: Header Tanggal yang Presisi Memayungi Jam di bawahnya */}
+          <div className="flex items-center gap-2">
             {groupedByDate.map((group) => {
-              const columnCount = group.items.length;
+              const groupWidth = group.items.length * ITEM_WIDTH + (group.items.length - 1) * 8; // Calc total width termasuk gap 8px (gap-2)
               return (
                 <div
                   key={group.dateFormatted}
-                  style={{ width: `${columnCount * 68}px` }}
-                  className="px-1.5 text-[10px] sm:text-xs font-extrabold text-slate-800 tracking-wide border-r border-slate-100 last:border-r-0 sm:w-auto"
+                  style={{ width: `${groupWidth}px`, minWidth: `${groupWidth}px` }}
+                  className="px-2.5 py-1 rounded-xl bg-sky-50/90 border border-sky-200/80 text-sky-950 font-extrabold text-xs truncate shrink-0"
                 >
                   {group.dateFormatted}
                 </div>
@@ -165,129 +220,41 @@ export const ForecastSummary: React.FC<ForecastSummaryProps> = ({
             })}
           </div>
 
-          {/* Row 1: Jam (18.00, 19.00, dst) */}
-          <div className="flex border-b border-slate-200/80">
+          {/* Row 1: Kartu Per Jam */}
+          <div className="inline-flex items-stretch gap-2">
             {displayHourlyData.map((item, idx) => (
               <div
-                key={`time-${idx}`}
-                className="w-[68px] min-w-[68px] sm:w-20 sm:min-w-[80px] py-2 text-center text-[10px] sm:text-xs font-bold text-slate-500"
+                key={idx}
+                style={{ width: `${ITEM_WIDTH}px`, minWidth: `${ITEM_WIDTH}px` }}
+                className="flex flex-col items-center gap-1 shrink-0 rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 px-1.5 py-2.5 transition-colors"
               >
-                {item.timeFormatted}
+                <span className="text-xs font-bold text-slate-600">{item.timeFormatted}</span>
+
+                <div className="py-0.5">
+                  <WeatherIcon condition={item.condition} size={28} isNight={item.isNight} />
+                </div>
+
+                <span className="text-base font-extrabold text-slate-900 tracking-tight">
+                  {Math.round(item.temp)}°
+                </span>
+
+                <span
+                  className={`flex items-center gap-0.5 text-[10px] font-bold h-3.5 ${
+                    item.rainProb > 0 ? 'text-sky-600' : 'text-transparent'
+                  }`}
+                >
+                  <Droplets size={10} className={item.rainProb > 0 ? 'fill-sky-100' : ''} />
+                  {item.rainProb > 0 ? `${item.rainProb}%` : '0%'}
+                </span>
+
+                <div className="w-full h-px bg-slate-200 my-0.5" />
+
+                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold">
+                  <span className="text-slate-700">{item.windArrow}</span>
+                  <span>{formatSpeed(item.windSpeed)} km/h</span>
+                </div>
               </div>
             ))}
-          </div>
-
-          {/* Category 1: CUACA, SUHU, KELEMBAPAN */}
-          <div className="pt-2.5 pb-3 border-b border-slate-100">
-            <div className="mb-1.5">
-              <span className="inline-block px-1.5 py-0.5 text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 rounded-md">
-                CUACA, SUHU, KELEMBAPAN
-              </span>
-            </div>
-
-            {/* Weather Icons Row */}
-            <div className="flex items-center">
-              {displayHourlyData.map((item, idx) => (
-                <div
-                  key={`icon-${idx}`}
-                  className="w-[68px] min-w-[68px] sm:w-20 sm:min-w-[80px] flex items-center justify-center py-1.5"
-                >
-                  <WeatherIcon
-                    condition={item.condition}
-                    size={22}
-                    isNight={item.isNight}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Temperature Row */}
-            <div className="flex items-center">
-              {displayHourlyData.map((item, idx) => (
-                <div
-                  key={`temp-${idx}`}
-                  className="w-[68px] min-w-[68px] sm:w-20 sm:min-w-[80px] text-center text-sm sm:text-base font-extrabold text-slate-900 tracking-tight"
-                >
-                  {Math.round(item.temp)}°
-                </div>
-              ))}
-            </div>
-
-            {/* Humidity Row */}
-            <div className="flex items-center mt-0.5">
-              {displayHourlyData.map((item, idx) => (
-                <div
-                  key={`hum-${idx}`}
-                  className="w-[68px] min-w-[68px] sm:w-20 sm:min-w-[80px] text-center text-[10px] sm:text-xs font-medium text-slate-400"
-                >
-                  {item.humidity}%
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Category 2: ANGIN */}
-          <div className="pt-2.5 pb-3 border-b border-slate-100">
-            <div className="mb-1.5">
-              <span className="inline-block px-1.5 py-0.5 text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 rounded-md">
-                ANGIN
-              </span>
-            </div>
-
-            {/* Wind Speed Row */}
-            <div className="flex items-center">
-              {displayHourlyData.map((item, idx) => (
-                <div
-                  key={`wind-${idx}`}
-                  className="w-[68px] min-w-[68px] sm:w-20 sm:min-w-[80px] text-center"
-                >
-                  <span className="text-xs sm:text-sm font-extrabold text-slate-900">
-                    {formatSpeed(item.windSpeed)}
-                  </span>{' '}
-                  <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">km/h</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Wind Direction & Arrow Row */}
-            <div className="flex items-center mt-0.5">
-              {displayHourlyData.map((item, idx) => (
-                <div
-                  key={`winddir-${idx}`}
-                  className="w-[68px] min-w-[68px] sm:w-20 sm:min-w-[80px] text-center text-[10px] sm:text-[11px] font-medium text-slate-600 flex items-center justify-center gap-0.5"
-                >
-                  <span>{item.windDirection}</span>
-                  <span className="text-slate-700 font-bold text-[10px] sm:text-xs">{item.windArrow}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Category 3: JARAK PANDANG */}
-          <div className="pt-2.5 pb-1">
-            <div className="mb-1.5">
-              <span className="inline-block px-1.5 py-0.5 text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 rounded-md">
-                JARAK PANDANG
-              </span>
-            </div>
-
-            {/* Visibility Row */}
-            <div className="flex items-center">
-              {displayHourlyData.map((item, idx) => {
-                const cleanVis = item.visibility.replace(/km/gi, '').trim();
-                return (
-                  <div
-                    key={`vis-${idx}`}
-                    className="w-[68px] min-w-[68px] sm:w-20 sm:min-w-[80px] text-center text-[11px] sm:text-xs text-slate-700"
-                  >
-                    <span className="font-extrabold text-slate-900">
-                      {cleanVis}
-                    </span>{' '}
-                    <span className="text-slate-400 font-medium text-[9px] sm:text-[10px]">km</span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
       </div>

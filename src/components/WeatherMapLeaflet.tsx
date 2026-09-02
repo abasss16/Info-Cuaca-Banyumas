@@ -27,7 +27,11 @@ import {
   BANYUMAS_KECAMATAN,
   KECAMATAN_ADMIN_COLORS,
   findPreciseLocation,
+  getDesaCoordinates,
+  findNearestDesaFromCoords,
+  getKecamatanById,
 } from '../data/banyumasRegions';
+import { BANYUMAS_DESA_BOUNDARIES } from '../data/banyumasDesaGeoportal';
 import {
   renderContinuousScalarLayer,
   WindFieldParticleEngine,
@@ -134,10 +138,23 @@ export const WeatherMapLeaflet: React.FC<WeatherMapLeafletProps> = ({
         setHoverData(null);
       });
 
-      // Click on any part of the map to select nearest kecamatan with high-precision polygon / village matcher
+      // Click on any part of the map to select nearest desa with high-precision Geoportal spatial dataset
       map.on('click', (e: L.LeafletMouseEvent) => {
         const clickLat = e.latlng.lat;
         const clickLng = e.latlng.lng;
+
+        const nearestDesa = findNearestDesaFromCoords(clickLat, clickLng);
+        if (nearestDesa) {
+          const kec = getKecamatanById(nearestDesa.kecamatanId);
+          if (kec && onSelectRegion) {
+            onSelectRegion(kec, nearestDesa.name, {
+              lat: nearestDesa.lat,
+              lng: nearestDesa.lng,
+              name: nearestDesa.name,
+            });
+            return;
+          }
+        }
 
         const precise = findPreciseLocation(clickLat, clickLng);
         if (precise.region && onSelectRegion) {
@@ -294,6 +311,55 @@ export const WeatherMapLeaflet: React.FC<WeatherMapLeafletProps> = ({
         interactive: false,
       });
       boundaryLayerGroupRef.current.addLayer(countyPolygon);
+
+      // 4. Always Render Selected Desa / Kelurahan Boundary from Geoportal Banyumas WFS
+      if (selectedRegion) {
+        const targetVil = selectedVillage || selectedRegion.villages?.[0] || selectedRegion.name;
+        const desaSpatial = getDesaCoordinates(selectedRegion.id, targetVil);
+        if (desaSpatial) {
+          const cleanName = desaSpatial.name.toLowerCase().trim();
+          const normName = cleanName.replace(/[\s\-_]/g, '');
+          let desaBoundary =
+            BANYUMAS_DESA_BOUNDARIES[`${selectedRegion.id}_${cleanName}`] ||
+            BANYUMAS_DESA_BOUNDARIES[cleanName];
+
+          if (!desaBoundary) {
+            desaBoundary = Object.values(BANYUMAS_DESA_BOUNDARIES).find(
+              (b) =>
+                b.kecamatanId === selectedRegion.id &&
+                (b.name.toLowerCase().trim() === cleanName ||
+                  b.name.toLowerCase().replace(/[\s\-_]/g, '') === normName)
+            );
+          }
+
+          if (desaBoundary && desaBoundary.coordinates) {
+            const desaPolygon = L.polygon(desaBoundary.coordinates as any, {
+              color: '#1d4ed8', // Royal Blue
+              weight: 3,
+              opacity: 1.0,
+              fillColor: '#38bdf8',
+              fillOpacity: 0.35,
+              interactive: true,
+              className: 'selected-desa-boundary',
+            });
+
+            desaPolygon.bindTooltip(
+              `<div class="p-1.5 text-left font-sans">
+                <div class="text-xs font-black text-blue-900 flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
+                  Desa/Kel. ${desaSpatial.name}
+                </div>
+                <div class="text-[10px] text-slate-700 font-semibold mt-0.5">Kecamatan ${selectedRegion.name}</div>
+                <div class="text-[9px] text-blue-700 font-bold mt-1">Batas Geoportal Banyumas WFS</div>
+              </div>`,
+              { sticky: true, className: 'glass-pill' }
+            );
+
+            boundaryLayerGroupRef.current.addLayer(desaPolygon);
+            desaPolygon.bringToFront();
+          }
+        }
+      }
     }
 
     // Selected location pin / Exact GPS pin rendering
@@ -306,22 +372,26 @@ export const WeatherMapLeaflet: React.FC<WeatherMapLeafletProps> = ({
       accuracyCircleRef.current = null;
     }
 
-    if (userExactCoords) {
+    const isRealGps = Boolean(
+      userExactCoords &&
+      userExactCoords.accuracy &&
+      userExactCoords.accuracy > 0
+    );
+
+    if (isRealGps && userExactCoords) {
       // 1. High precision GPS location marker with accuracy circle
-      if (userExactCoords.accuracy && userExactCoords.accuracy > 0) {
-        accuracyCircleRef.current = L.circle(
-          [userExactCoords.lat, userExactCoords.lng],
-          {
-            radius: Math.min(Math.max(userExactCoords.accuracy, 15), 350),
-            color: '#0284c7',
-            fillColor: '#38bdf8',
-            fillOpacity: 0.16,
-            weight: 1.5,
-            dashArray: '3, 4',
-            interactive: false,
-          }
-        ).addTo(map);
-      }
+      accuracyCircleRef.current = L.circle(
+        [userExactCoords.lat, userExactCoords.lng],
+        {
+          radius: Math.min(Math.max(userExactCoords.accuracy || 15, 15), 350),
+          color: '#0284c7',
+          fillColor: '#38bdf8',
+          fillOpacity: 0.16,
+          weight: 1.5,
+          dashArray: '3, 4',
+          interactive: false,
+        }
+      ).addTo(map);
 
       const gpsPinIcon = L.divIcon({
         className: 'custom-gps-pin',
@@ -367,13 +437,21 @@ export const WeatherMapLeaflet: React.FC<WeatherMapLeafletProps> = ({
         duration: 1.2,
       });
     } else if (selectedRegion) {
-      // 2. Standard Kecamatan Centroid pin
+      // 2. Exact Desa / Kelurahan Centroid pin from Geoportal Banyumas WFS
+      const targetVil = selectedVillage || selectedRegion.villages?.[0] || selectedRegion.name;
+      const desaSpatial = getDesaCoordinates(selectedRegion.id, targetVil);
+      const isDesaSpecific = !!desaSpatial;
+      const pinLat = desaSpatial ? desaSpatial.lat : (userExactCoords ? userExactCoords.lat : selectedRegion.lat);
+      const pinLng = desaSpatial ? desaSpatial.lng : (userExactCoords ? userExactCoords.lng : selectedRegion.lng);
+      const villageDisplayName = desaSpatial ? desaSpatial.name : targetVil;
+
       const pinIcon = L.divIcon({
         className: 'custom-pin-icon',
         html: `
           <div class="relative flex items-center justify-center">
-            <div class="absolute w-8 h-8 bg-sky-500/40 rounded-full animate-ping"></div>
-            <div class="w-7 h-7 bg-sky-600 border-2 border-white text-white rounded-full flex items-center justify-center shadow-lg">
+            <div class="absolute w-9 h-9 bg-sky-500/35 rounded-full animate-ping"></div>
+            <div class="absolute w-6 h-6 bg-blue-500/40 rounded-full animate-pulse"></div>
+            <div class="relative w-7 h-7 bg-linear-to-b from-sky-500 to-blue-700 border-2 border-white text-white rounded-full flex items-center justify-center shadow-lg shadow-sky-900/30">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
             </div>
           </div>
@@ -382,12 +460,36 @@ export const WeatherMapLeaflet: React.FC<WeatherMapLeafletProps> = ({
         iconAnchor: [14, 28],
       });
 
-      markerRef.current = L.marker([selectedRegion.lat, selectedRegion.lng], {
+      const marker = L.marker([pinLat, pinLng], {
         icon: pinIcon,
-        zIndexOffset: 1000,
+        zIndexOffset: 1200,
       }).addTo(map);
 
-      map.panTo([selectedRegion.lat, selectedRegion.lng], { animate: true, duration: 0.8 });
+      marker.bindPopup(`
+        <div class="p-1 font-sans text-left">
+          <div class="text-[11px] font-bold text-sky-700 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-sky-600 animate-pulse"></span>
+            ${isDesaSpecific ? 'Titik Desa/Kelurahan Terpilih' : 'Kecamatan Banyumas'}
+          </div>
+          <div class="text-xs font-black text-slate-900 mt-0.5">
+            ${isDesaSpecific ? `Desa/Kel. ${villageDisplayName}` : selectedRegion.name}
+          </div>
+          <div class="text-[11px] text-slate-600 font-semibold">
+            Kecamatan ${selectedRegion.name}
+          </div>
+          <div class="text-[10px] text-slate-500 font-mono mt-0.5">
+            ${pinLat.toFixed(5)}, ${pinLng.toFixed(5)}
+          </div>
+          <div class="text-[9px] text-sky-600 font-semibold mt-1">
+            Data Spasial Geoportal Banyumas
+          </div>
+        </div>
+      `);
+
+      markerRef.current = marker;
+
+      const targetZoom = isDesaSpecific ? (isCompact ? 13 : 14) : (isCompact ? 11 : 12);
+      map.flyTo([pinLat, pinLng], targetZoom, { animate: true, duration: 1.0 });
     }
   }, [selectedRegion, selectedVillage, userExactCoords, showBoundaries, baseMap]);
 
